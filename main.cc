@@ -163,11 +163,16 @@ public:
         for (const auto &q: _queues) {
             msg << static_cast<int>(q.size()) << " ";
         }
+        msg << " | ";
+        for (const auto &i: _idxs) {
+            msg << i << " ";
+        }
         spdlog::debug("queue info: {}", msg.str());
     }
 
 private:
     SafeQueue<T>& get_min_queue() {
+        std::lock_guard lock(_mut);
         for (int i = _idxs.size() - 1; i > 0; i--) {
             int p = i / 2;
             if (_queues[_idxs[p]].size() > _queues[_idxs[i]].size()) {
@@ -182,13 +187,14 @@ private:
     std::vector<SafeQueue<T>> _queues;
     std::vector<int> _idxs;
     std::atomic<int> _count = 0;
+    std::mutex _mut;
 };
 
 void queue_travel(const std::string &path)
 {
     TIMER_SCOPE_MS("queue travel");
 
-    int queue_num = 3;
+    int queue_num = 10;
     std::atomic<int> signal = 0;
     QueueManger<fs::directory_entry> qm(queue_num);
     std::atomic<int> count;
@@ -210,16 +216,17 @@ void queue_travel(const std::string &path)
                 signal--;
             }
         }
-        // spdlog::info("thread {} exit", idx);
+        // spdlog::debug("thread {} exit", idx);
         
     };
 
-    std::thread monitor([&qm, &signal](){
-        while (qm.size() > 0 || signal > 0) {
-            qm.monitor();
-            std::this_thread::sleep_for(ch::milliseconds(20));
-        }
-    });
+    // 监控每个队列的数量
+    // std::thread monitor([&qm, &signal](){
+    //     while (qm.size() > 0 || signal > 0) {
+    //         qm.monitor();
+    //         std::this_thread::sleep_for(ch::milliseconds(20));
+    //     }
+    // });
 
     std::vector<std::thread> ths;
     for (int i = 0; i < queue_num; i++) {
@@ -229,7 +236,6 @@ void queue_travel(const std::string &path)
     for (auto &t: ths) {
         t.join();
     }
-    monitor.join();
     spdlog::info("directory num: {}", count);
 }
 
