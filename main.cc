@@ -202,6 +202,7 @@ void queue_travel(const std::string &path)
                 signal--;
             }
         }
+        // spdlog::info("thread {} exit", idx);
         
     };
 
