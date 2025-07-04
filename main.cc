@@ -115,7 +115,7 @@ public:
         return true;
     }
 
-    inline size_t size() {
+    inline size_t size() const {
         return _queue.size();
     }
 
@@ -154,8 +154,16 @@ public:
         return sucess;
     }
 
-    inline size_t size() {
+    inline size_t size() const {
         return _count;
+    }
+
+    void monitor() {
+        std::ostringstream msg;
+        for (const auto &q: _queues) {
+            msg << static_cast<int>(q.size()) << " ";
+        }
+        spdlog::debug("queue info: {}", msg.str());
     }
 
 private:
@@ -206,6 +214,13 @@ void queue_travel(const std::string &path)
         
     };
 
+    std::thread monitor([&qm, &signal](){
+        while (qm.size() > 0 || signal > 0) {
+            qm.monitor();
+            std::this_thread::sleep_for(ch::milliseconds(20));
+        }
+    });
+
     std::vector<std::thread> ths;
     for (int i = 0; i < queue_num; i++) {
         ths.emplace_back(travel, i);
@@ -214,6 +229,7 @@ void queue_travel(const std::string &path)
     for (auto &t: ths) {
         t.join();
     }
+    monitor.join();
     spdlog::info("directory num: {}", count);
 }
 
@@ -237,7 +253,7 @@ int main(int argc, char **argv)
         return -1;
     }
     
-    single_thread_travel(argv[1]);
+    // single_thread_travel(argv[1]);
     // multi_thread_travel(argv[1]);
     queue_travel(argv[1]);
     return 0;
